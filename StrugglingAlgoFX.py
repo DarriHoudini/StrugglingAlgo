@@ -62,61 +62,52 @@ class OANDAForexBot:
     response = self.client.request(r)
     return response
 
-    def fibonacci_levels(self, high, low):
-        # Calculate Fibonacci levels
-        diff = high - low
-        levels = {
-            "0": low,
-            "61.8": low + 0.618 * diff,
-            "78.6": low + 0.786 * diff,
-            "-27": high + 0.27 * diff,
-        }
-        return levels
 
-    def run_strategy(self):
-        for instrument in self.instruments:
-            if self.daily_loss >= self.max_daily_risk:
-                print(f"Daily risk limit reached. Stopping trades for {instrument}.")
-                continue
+def run_strategy(self):
+    for instrument in self.instruments:
+        balance, last_price, quantity = self.position_sizing(instrument)
 
-            balance = self.get_account_balance()
-            bid_price, ask_price = self.get_price(instrument)
+        impulse_detected, impulse_direction, fib_levels = self.detect_impulse_and_fibs(
+            instrument
+        )
 
-            # Define impulse move (you need to implement logic to detect this)
-            high = 1.1000  # Example value (replace with actual detection logic)
-            low = 1.0900   # Example value (replace with actual detection logic)
+        if impulse_detected:
+            entry_price = (
+                fib_levels["61.8"]
+                if impulse_direction == "bullish"
+                else fib_levels["78.6"]
+            )
+            stop_loss_price = (
+                fib_levels["0.0"]
+                if impulse_direction == "bullish"
+                else fib_levels["low"]
+            )
+            target_price = (
+                fib_levels["-0.27"]
+                if impulse_direction == "bullish"
+                else fib_levels["-0.27"]
+            )
 
-            levels = self.fibonacci_levels(high, low)
-            entry_price = None
-            stop_loss_price = None
-            take_profit_price = None
+            risk_per_trade = (
+                0.02 if impulse_direction == "bullish" else 0.03
+            ) * self.starting_balance
 
-            if bid_price <= levels["78.6"]:
-                # Bullish entry near 78.6% Fibonacci retracement
-                entry_price = bid_price
-                stop_loss_price = levels["0"]
-                take_profit_price = levels["-27"]
-                risk = self.calculate_risk(0.0002, self.starting_balance)  # 0.02% risk for buys
+            # Calculate position size based on risk
+            position_size = round(
+                risk_per_trade / abs(entry_price - stop_loss_price), 2
+            )
 
-            elif ask_price >= levels["78.6"]:
-                # Bearish entry near 78.6% Fibonacci retracement
-                entry_price = ask_price
-                stop_loss_price = levels["0"]
-                take_profit_price = levels["-27"]
-                risk = self.calculate_risk(0.0003, self.starting_balance)  # 0.03% risk for sells
-
-            if entry_price and stop_loss_price and take_profit_price:
-                # Calculate position size based on risk
-                units = round(risk / abs(entry_price - stop_loss_price), 2)
-                side = "buy" if bid_price <= levels["78.6"] else "sell"
-
-                response = self.place_order(
+            if entry_price <= last_price <= fib_levels["78.6"]:
+                # Place order
+                side = "buy" if impulse_direction == "bullish" else "sell"
+                self.place_order(
                     instrument,
-                    units,
+                    position_size,
                     side,
-                    take_profit_price=take_profit_price,
+                    take_profit_price=target_price,
                     stop_loss_price=stop_loss_price,
                 )
+
 
                 print(f"Placed {side} order for {instrument}: {response}")
 

@@ -86,31 +86,45 @@ class OANDAForexBot:
             impulse_detected, impulse_direction, fib_levels = self.detect_impulse_and_fibs(instrument)
 
             if impulse_detected:
-                bid_price, ask_price = self.get_price(instrument)
-                last_price = (bid_price + ask_price) / 2
+    entry_price = (
+        fib_levels["61.8"]
+        if impulse_direction == "bullish"
+        else fib_levels["78.6"]
+    )
+    stop_loss_price = (
+        fib_levels["0.0"]
+        if impulse_direction == "bullish"
+        else fib_levels["low"]
+    )
+    target_price = (
+        fib_levels["-0.27"]
+        if impulse_direction == "bullish"
+        else fib_levels["-0.27"]
+    )
 
-                entry_price = fib_levels["61.8"] if impulse_direction == "bullish" else fib_levels["78.6"]
-                stop_loss_price = fib_levels["0.0"] if impulse_direction == "bullish" else fib_levels["low"]
-                target_price = fib_levels["-0.27"]
+    risk_per_trade = (
+        0.02 if impulse_direction == "bullish" else 0.03
+    ) * self.starting_balance
 
-                risk_per_trade = (0.02 if impulse_direction == "bullish" else 0.03) * self.starting_balance
+    # Calculate position size based on risk (convert to integer for OANDA compliance)
+    position_size = int(risk_per_trade / abs(entry_price - stop_loss_price))
 
-                position_size = self.position_sizing(risk_per_trade / self.starting_balance, entry_price, stop_loss_price)
+    if entry_price <= last_price <= fib_levels["78.6"]:
+        # Place order
+        side = "buy" if impulse_direction == "bullish" else "sell"
+        response = self.place_order(
+            instrument,
+            position_size,
+            side,
+            take_profit_price=target_price,
+            stop_loss_price=stop_loss_price,
+        )
 
-                if (impulse_direction == "bullish" and last_price <= fib_levels["78.6"]) or (
-                    impulse_direction == "bearish" and last_price >= fib_levels["61.8"]
-                ):
-                    # Place order
-                    side = "buy" if impulse_direction == "bullish" else "sell"
-                    response = self.place_order(
-                        instrument,
-                        position_size,
-                        side,
-                        take_profit_price=target_price,
-                        stop_loss_price=stop_loss_price,
-                    )
+        print(f"Placed {side} order for {instrument}: {response}")
 
-                    print(f"Placed {side} order for {instrument}: {response}")
+        # Update daily loss if stop loss is hit
+        self.daily_loss += risk_per_trade
+
 
 # Initialize and run the bot
 if __name__ == "__main__":

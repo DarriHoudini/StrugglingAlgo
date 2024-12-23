@@ -40,20 +40,27 @@ class OANDAForexBot:
     def calculate_risk(self, risk_percentage, balance):
         return balance * risk_percentage
 
-    def place_order(self, instrument, units, side, take_profit_price=None, stop_loss_price=None):
-        # Create an OANDA market order with optional take-profit and stop-loss
-        order = {
-            "order": {
-                "instrument": instrument,
-                "units": str(units) if side == "buy" else str(-units),
-                "type": "MARKET",
-                "takeProfitOnFill": {"price": str(take_profit_price)} if take_profit_price else None,
-                "stopLossOnFill": {"price": str(stop_loss_price)} if stop_loss_price else None,
-            }
+   def place_order(self, instrument, units, side, take_profit_price=None, stop_loss_price=None):
+    # Create an OANDA market order with optional take-profit and stop-loss
+    order = {
+        "order": {
+            "instrument": instrument,
+            "units": str(units) if side == "buy" else str(-units),
+            "type": "MARKET",
+            "timeInForce": "FOK",  # Fill-or-Kill order type
         }
-        r = orders.OrderCreate(accountID=self.account_id, data=order)
-        response = self.client.request(r)
-        return response
+    }
+
+    # Add take-profit and stop-loss if specified
+    if take_profit_price:
+        order["order"]["takeProfitOnFill"] = {"price": str(take_profit_price)}
+    if stop_loss_price:
+        order["order"]["stopLossOnFill"] = {"price": str(stop_loss_price)}
+
+    # Submit the order
+    r = orders.OrderCreate(accountID=self.account_id, data=order)
+    response = self.client.request(r)
+    return response
 
     def fibonacci_levels(self, high, low):
         # Calculate Fibonacci levels

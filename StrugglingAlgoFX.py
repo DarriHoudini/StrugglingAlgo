@@ -5,7 +5,7 @@ from oandapyV20.types import StopLossDetails, TakeProfitDetails
 from datetime import datetime, timedelta
 
 # OANDA API credentials
-OANDA_API_KEY = "202b93d2dab020adc166e50925b0d693-98e1dc4f4e269f5586b6805bd4827c18"
+OANDA_API_KEY = "53aa1e1a3506aed9c9c12cd2febca8c5-07b9175931d4e54886100a3ef687b0f4"
 OANDA_ACCOUNT_ID = "101-001-29240766-001"
 OANDA_API_URL = "https://api-fxpractice.oanda.com/v3"  # Use practice API for testing
 

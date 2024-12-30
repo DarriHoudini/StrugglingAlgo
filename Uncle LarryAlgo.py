@@ -1,5 +1,5 @@
 //@version=5
-strategy("ICT 4-in-1 Demo - Simplified Sessions (London & NY)", overlay=true, pyramiding=0)
+strategy("ICT 4-in-1 with Risk Management", overlay=true, pyramiding=0)
 
 //=============================================================================
 // 1) SESSION LOGIC (London and New York Sessions Only)
@@ -11,7 +11,7 @@ nyEndHour       = input.int(16, "New York End Hour")
 
 // Check if the current hour is within either session
 f_inSession(_t) =>
-    (hour(_t) >= londonStartHour and hour(_t) < londonEndHour) 
+    (hour(_t) >= londonStartHour and hour(_t) < londonEndHour) or
     (hour(_t) >= nyStartHour and hour(_t) < nyEndHour)
 
 inSession = f_inSession(time)
@@ -33,47 +33,56 @@ bullFVG = (c2low > c1high) or (c2low > c3high)
 bearFVG = (c2high < c1low) or (c2high < c3low)
 
 //=============================================================================
-// 3) BREAK OF STRUCTURE (Reduced fractal lookback from 10 to 3)
+// 3) RISK MANAGEMENT CONFIGURATION
 //=============================================================================
-fFractalHigh(_i) =>
-    high[_i] > high[_i + 1] and high[_i] > high[_i - 1]
+riskPercent = input.float(2.0, "Risk Per Trade (%)")  // Risk 2% of equity per trade
 
-fFractalLow(_i) =>
-    low[_i] < low[_i + 1] and low[_i] < low[_i - 1]
-
-fractalLookback = input.int(3, "Fractal BOS lookback bars")
-
-var float lastFractalHigh    = na
-var float lastFractalLow     = na
-var int   lastFractalHighBar = na
-var int   lastFractalLowBar  = na
-
-if barstate.isnew
-    // fractal high
-    for i = 1 to fractalLookback
-        if fFractalHigh(i)
-            lastFractalHigh    := high[i]
-            lastFractalHighBar := bar_index - i
-            break
-    // fractal low
-    for i = 1 to fractalLookback
-        if fFractalLow(i)
-            lastFractalLow    := low[i]
-            lastFractalLowBar := bar_index - i
-            break
-
-bullBOS = not na(lastFractalHigh) and (close > lastFractalHigh)
-bearBOS = not na(lastFractalLow)  and (close < lastFractalLow)
+// Function to calculate position size based on stop-loss
+f_positionSize(_entry, _stop) =>
+    riskAmount = strategy.equity * (riskPercent / 100)
+    distanceToSL = math.abs(_entry - _stop)
+    distanceToSL > 0 ? (riskAmount / distanceToSL) : na
 
 //=============================================================================
-// 4) REMOVE Premium/Discount Requirement for demonstration
+// 4) SUPPORT/RESISTANCE FOR TAKE-PROFIT
 //=============================================================================
-longCondition  = inSession and (bullFVG or bullBOS)
-shortCondition = inSession and (bearFVG or bearBOS)
+// Find the nearest swing high/low within a lookback period
+f_findSwingHigh(_lookback) =>
+    var float highest = na
+    for i = 1 to _lookback
+        if high[i] > highest or na(highest)
+            highest := high[i]
+    highest
 
-// Simple example: entry on conditions
-if longCondition
-    strategy.entry("Long", strategy.long)
-    
-if shortCondition
-    strategy.entry("Short", strategy.short)
+f_findSwingLow(_lookback) =>
+    var float lowest = na
+    for i = 1 to _lookback
+        if low[i] < lowest or na(lowest)
+            lowest := low[i]
+    lowest
+
+swingLookback = input.int(10, "Swing High/Low Lookback Bars")  // Lookback for TP targets
+
+//=============================================================================
+// 5) ENTRY CONDITIONS WITH STOP/TP LOGIC
+//=============================================================================
+if inSession
+    // LONG CONDITION: Bullish FVG
+    if bullFVG
+        entryPrice   = close
+        stopLoss     = c2low  // Just below the FVG
+        takeProfit   = f_findSwingHigh(swingLookback)  // Next resistance level
+        positionSize = f_positionSize(entryPrice, stopLoss)
+        if not na(positionSize)
+            strategy.entry("Long", strategy.long, qty=positionSize)
+            strategy.exit("Long TP/SL", from_entry="Long", stop=stopLoss, limit=takeProfit)
+
+    // SHORT CONDITION: Bearish FVG
+    if bearFVG
+        entryPrice   = close
+        stopLoss     = c2high  // Just above the FVG
+        takeProfit   = f_findSwingLow(swingLookback)  // Next support level
+        positionSize = f_positionSize(entryPrice, stopLoss)
+        if not na(positionSize)
+            strategy.entry("Short", strategy.short, qty=positionSize)
+            strategy.exit("Short TP/SL", from_entry="Short", stop=stopLoss, limit=takeProfit)

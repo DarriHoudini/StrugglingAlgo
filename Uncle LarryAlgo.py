@@ -1,18 +1,20 @@
 //@version=5
-strategy("ICT 4-in-1 Demo - More Frequent Trades", overlay=true)
+strategy("ICT 4-in-1 Demo - Simplified Sessions (London & NY)", overlay=true, pyramiding=0)
 
 //=============================================================================
-// 1) TIME FILTER (Disabled by default: 24h session)
+// 1) SESSION LOGIC (London and New York Sessions Only)
 //=============================================================================
-startHour   = input.int(0, "Session Start Hour (24h)")
-endHour     = input.int(24, "Session End Hour (24h)")
-useTimeFilt = input.bool(false, "Use Time Filter?")
+londonStartHour = input.int(2, "London Start Hour")
+londonEndHour   = input.int(11, "London End Hour")  // Ends when NY session overlaps
+nyStartHour     = input.int(11, "New York Start Hour")
+nyEndHour       = input.int(16, "New York End Hour")
 
+// Check if the current hour is within either session
 f_inSession(_t) =>
-    hourInSession = (hour(_t) >= startHour) and (hour(_t) < endHour)
-    hourInSession
+    (hour(_t) >= londonStartHour and hour(_t) < londonEndHour) 
+    (hour(_t) >= nyStartHour and hour(_t) < nyEndHour)
 
-inSession = useTimeFilt ? f_inSession(time) : true
+inSession = f_inSession(time)
 
 //=============================================================================
 // 2) FAIR VALUE GAP (Looser Condition)
@@ -72,13 +74,6 @@ shortCondition = inSession and (bearFVG or bearBOS)
 // Simple example: entry on conditions
 if longCondition
     strategy.entry("Long", strategy.long)
-
+    
 if shortCondition
     strategy.entry("Short", strategy.short)
-
-// Plot fractal lines for debug
-plotshape(bullBOS, style=shape.labelup,   color=color.green,  size=size.tiny, text="BOS↑")
-plotshape(bearBOS, style=shape.labeldown, color=color.red,    size=size.tiny, text="BOS↓")
-
-plotshape(bullFVG, style=shape.circle, color=color.new(color.lime, 0),   text="FVG↑", location=location.top)
-plotshape(bearFVG, style=shape.circle, color=color.new(color.red,  0),   text="FVG↓", location=location.bottom)

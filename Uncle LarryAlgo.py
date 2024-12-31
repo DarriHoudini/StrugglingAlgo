@@ -1,14 +1,17 @@
 //@version=5
-strategy("ICT Strategy with Fixed $20 Risk", overlay=true, pyramiding=0)
+strategy("Uncle Larry", overlay=true, pyramiding=0)
 
 //=============================================================================
-// 1) SESSION LOGIC (London and New York Sessions Only)
+// 1) SESSION LOGIC (Asian, London, and New York Sessions)
 //=============================================================================
-londonStartHour = input.int(2, "London Start Hour")
-nyStartHour     = input.int(11, "New York Start Hour")
-nyEndHour       = input.int(16, "New York End Hour")
+asianStartHour = input.int(0, "Asian Start Hour")       // Default: Midnight
+asianEndHour   = input.int(6, "Asian End Hour")         // Default: 6 AM
+londonStartHour = input.int(2, "London Start Hour")     // Default: 2 AM
+nyStartHour     = input.int(11, "New York Start Hour")  // Default: 11 AM
+nyEndHour       = input.int(16, "New York End Hour")    // Default: 4 PM
 
 f_inSession(_t) =>
+    (hour(_t) >= asianStartHour and hour(_t) < asianEndHour)
     (hour(_t) >= londonStartHour and hour(_t) < nyEndHour)
 
 inSession = f_inSession(time)

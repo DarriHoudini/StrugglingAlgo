@@ -1,5 +1,5 @@
 //@version=5
-strategy("ICT Strategy with TradeAdapter Integration", overlay=true, pyramiding=0)
+strategy("ICT Strategy with Fixed $20 Risk", overlay=true, pyramiding=0)
 
 //=============================================================================
 // 1) SESSION LOGIC (London and New York Sessions Only)
@@ -43,12 +43,16 @@ liquiditySweepHigh = high >= ta.highest(high, 10)
 liquiditySweepLow = low <= ta.lowest(low, 10)
 
 //=============================================================================
-// 6) FIXED RISK CALCULATION
+// 6) FIXED $20 RISK CALCULATION
 //=============================================================================
-fixedRisk = 35  // Fixed risk per trade in $
+riskPerTrade = 20  // Fixed risk per trade in $
+
+pipValueMultiplier = input.float(10, "Pip Value Multiplier (depends on broker)")
 f_positionSize(_entry, _stop) =>
-    riskPerUnit = math.abs(_entry - _stop)
-    riskPerUnit > 0 ? fixedRisk / riskPerUnit : na
+    stopLossDistance = math.abs(_entry - _stop)
+    pipValue = pipValueMultiplier / syminfo.pointvalue
+    riskPerUnit = stopLossDistance * pipValue
+    riskPerUnit > 0 ? riskPerTrade / riskPerUnit : na
 
 //=============================================================================
 // 7) ENTRY CONDITIONS
@@ -57,7 +61,7 @@ longCondition = inSession and (bullFVG or liquiditySweepLow or momentumLong) and
 shortCondition = inSession and (bearFVG or liquiditySweepHigh or momentumShort) and htfBearTrend
 
 //=============================================================================
-// 8) ENTRY LOGIC WITH ALERTS FOR TRADEADAPTER
+// 8) ENTRY LOGIC WITH DYNAMIC POSITION SIZING
 //=============================================================================
 
 // Long Trades
@@ -71,9 +75,6 @@ if longCondition
         strategy.entry("Long", strategy.long, qty=positionSize)
         strategy.exit("Long TP/SL", from_entry="Long", stop=stopLoss, limit=takeProfit)
 
-        // TradeAdapter Alert for Long Trade
-        alert('{"action": "buy", "symbol": "' + syminfo.ticker + '", "size": "' + str.tostring(positionSize) + '", "sl": "' + str.tostring(stopLoss) + '", "tp": "' + str.tostring(takeProfit) + '"}', alert.freq_once_per_bar_close)
-
 // Short Trades
 if shortCondition
     entryPrice = close
@@ -84,6 +85,3 @@ if shortCondition
     if not na(positionSize) and positionSize > 0
         strategy.entry("Short", strategy.short, qty=positionSize)
         strategy.exit("Short TP/SL", from_entry="Short", stop=stopLoss, limit=takeProfit)
-
-        // TradeAdapter Alert for Short Trade
-        alert('{"action": "sell", "symbol": "' + syminfo.ticker + '", "size": "' + str.tostring(positionSize) + '", "sl": "' + str.tostring(stopLoss) + '", "tp": "' + str.tostring(takeProfit) + '"}', alert.freq_once_per_bar_close)

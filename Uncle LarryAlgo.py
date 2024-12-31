@@ -1,5 +1,5 @@
 //@version=5
-strategy("ICT Strategy with Dynamic Risk-Reward", overlay=true, pyramiding=0)
+strategy("ICT Strategy with Native SL/TP", overlay=true, pyramiding=0)
 
 //=============================================================================
 // 1) SESSION LOGIC (London and New York Sessions Only)
@@ -57,41 +57,39 @@ longCondition = inSession and (bullFVG or liquiditySweepLow or momentumLong) and
 shortCondition = inSession and (bearFVG or liquiditySweepHigh or momentumShort) and htfBearTrend
 
 //=============================================================================
-// 8) ENTRY LOGIC WITH DYNAMIC RISK-REWARD
+// 8) ENTRY LOGIC WITH MULTI-LEVEL TARGETS
 //=============================================================================
+
+// Long Trades
 if longCondition
     entryPrice = close
     stopLoss = low[fvgLookback]  // Stop-loss just below the FVG
-    takeProfit1 = entryPrice + (entryPrice - stopLoss) * 1  // 1:1 Take-profit
-    takeProfit2 = entryPrice + (entryPrice - stopLoss) * 2  // 1:2 Take-profit
+    takeProfit = entryPrice + (entryPrice - stopLoss) * 1  // 1:1 Take-profit
 
     positionSize = f_positionSize(entryPrice, stopLoss)
-    if not na(positionSize)
+    if not na(positionSize) and positionSize > 0
         strategy.entry("Long", strategy.long, qty=positionSize)
-        
-        // Exit logic: Check momentum for 1:2, otherwise close at 1:1
-        if momentumLong
-            strategy.exit("Long TP/SL (1:2)", from_entry="Long", stop=stopLoss, limit=takeProfit2)
-        else
-            strategy.exit("Long TP/SL (1:1)", from_entry="Long", stop=stopLoss, limit=takeProfit1)
+        strategy.exit("Long TP/SL", from_entry="Long", stop=stopLoss, limit=takeProfit)
 
+// Short Trades
 if shortCondition
     entryPrice = close
     stopLoss = high[fvgLookback]  // Stop-loss just above the FVG
     takeProfit1 = entryPrice - (stopLoss - entryPrice) * 1  // 1:1 Take-profit
     takeProfit2 = entryPrice - (stopLoss - entryPrice) * 2  // 1:2 Take-profit
+    takeProfit3 = entryPrice - (stopLoss - entryPrice) * 3  // 1:3 Take-profit
 
     positionSize = f_positionSize(entryPrice, stopLoss)
-    if not na(positionSize)
+    if not na(positionSize) and positionSize > 0
         strategy.entry("Short", strategy.short, qty=positionSize)
         
-        // Exit logic: Check momentum for 1:2, otherwise close at 1:1
+        // Multi-level exit logic for shorts
         if momentumShort
-            strategy.exit("Short TP/SL (1:2)", from_entry="Short", stop=stopLoss, limit=takeProfit2)
+            strategy.exit("Short TP/SL (1:3)", from_entry="Short", stop=stopLoss, limit=takeProfit3)
         else
             strategy.exit("Short TP/SL (1:1)", from_entry="Short", stop=stopLoss, limit=takeProfit1)
 
 //=============================================================================
 // CLEANED VISUALIZATION
 //=============================================================================
-// No additional visual elements for a clean chart
+// Removed custom plot() for Stop-Loss and Take-Profit

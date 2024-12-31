@@ -1,5 +1,5 @@
 //@version=5
-strategy("ICT Strategy with Native SL/TP", overlay=true, pyramiding=0)
+strategy("ICT Strategy with TradeAdapter Integration", overlay=true, pyramiding=0)
 
 //=============================================================================
 // 1) SESSION LOGIC (London and New York Sessions Only)
@@ -57,7 +57,7 @@ longCondition = inSession and (bullFVG or liquiditySweepLow or momentumLong) and
 shortCondition = inSession and (bearFVG or liquiditySweepHigh or momentumShort) and htfBearTrend
 
 //=============================================================================
-// 8) ENTRY LOGIC WITH MULTI-LEVEL TARGETS
+// 8) ENTRY LOGIC WITH ALERTS FOR TRADEADAPTER
 //=============================================================================
 
 // Long Trades
@@ -71,25 +71,19 @@ if longCondition
         strategy.entry("Long", strategy.long, qty=positionSize)
         strategy.exit("Long TP/SL", from_entry="Long", stop=stopLoss, limit=takeProfit)
 
+        // TradeAdapter Alert for Long Trade
+        alert('{"action": "buy", "symbol": "' + syminfo.ticker + '", "size": "' + str.tostring(positionSize) + '", "sl": "' + str.tostring(stopLoss) + '", "tp": "' + str.tostring(takeProfit) + '"}', alert.freq_once_per_bar_close)
+
 // Short Trades
 if shortCondition
     entryPrice = close
     stopLoss = high[fvgLookback]  // Stop-loss just above the FVG
-    takeProfit1 = entryPrice - (stopLoss - entryPrice) * 1  // 1:1 Take-profit
-    takeProfit2 = entryPrice - (stopLoss - entryPrice) * 2  // 1:2 Take-profit
-    takeProfit3 = entryPrice - (stopLoss - entryPrice) * 3  // 1:3 Take-profit
+    takeProfit = entryPrice - (stopLoss - entryPrice) * 1  // 1:1 Take-profit
 
     positionSize = f_positionSize(entryPrice, stopLoss)
     if not na(positionSize) and positionSize > 0
         strategy.entry("Short", strategy.short, qty=positionSize)
-        
-        // Multi-level exit logic for shorts
-        if momentumShort
-            strategy.exit("Short TP/SL (1:3)", from_entry="Short", stop=stopLoss, limit=takeProfit3)
-        else
-            strategy.exit("Short TP/SL (1:1)", from_entry="Short", stop=stopLoss, limit=takeProfit1)
+        strategy.exit("Short TP/SL", from_entry="Short", stop=stopLoss, limit=takeProfit)
 
-//=============================================================================
-// CLEANED VISUALIZATION
-//=============================================================================
-// Removed custom plot() for Stop-Loss and Take-Profit
+        // TradeAdapter Alert for Short Trade
+        alert('{"action": "sell", "symbol": "' + syminfo.ticker + '", "size": "' + str.tostring(positionSize) + '", "sl": "' + str.tostring(stopLoss) + '", "tp": "' + str.tostring(takeProfit) + '"}', alert.freq_once_per_bar_close)

@@ -1,5 +1,5 @@
 //@version=5
-strategy("ICT Strategy with Adjusted Confirmation", overlay=true, pyramiding=0)
+strategy("ICT Strategy with Dynamic Risk-Reward", overlay=true, pyramiding=0)
 
 //=============================================================================
 // 1) SESSION LOGIC (London and New York Sessions Only)
@@ -18,18 +18,17 @@ inSession = f_inSession(time)
 //=============================================================================
 fvgLookback = input.int(1, "FVG Lookback Offset")
 
-// Broadened FVG conditions
 bullFVG = low[fvgLookback] >= high[fvgLookback + 1]
 bearFVG = high[fvgLookback] <= low[fvgLookback + 1]
 
 //=============================================================================
-// 3) MOMENTUM FILTER (Optional)
+// 3) MOMENTUM FILTER
 //=============================================================================
 fastMA = ta.sma(close, 5)
 slowMA = ta.sma(close, 20)
 
-momentumLong = ta.crossover(fastMA, slowMA) or true
-momentumShort = ta.crossunder(fastMA, slowMA) or true
+momentumLong = ta.crossover(fastMA, slowMA)
+momentumShort = ta.crossunder(fastMA, slowMA)
 
 //=============================================================================
 // 4) MULTI-TIMEFRAME TREND (30-Minute Confirmation)
@@ -40,50 +39,59 @@ htfBearTrend = request.security(syminfo.tickerid, "30", close < ta.sma(close, 20
 //=============================================================================
 // 5) LIQUIDITY SWEEPS
 //=============================================================================
-liquiditySweepHigh = high >= ta.highest(high, 10)  // Broader lookback for highs
-liquiditySweepLow = low <= ta.lowest(low, 10)  // Broader lookback for lows
+liquiditySweepHigh = high >= ta.highest(high, 10)
+liquiditySweepLow = low <= ta.lowest(low, 10)
 
 //=============================================================================
-// 6) ENTRY CONDITIONS
+// 6) FIXED RISK CALCULATION
 //=============================================================================
-// Use OR conditions to broaden trade setups
+fixedRisk = 35  // Fixed risk per trade in $
+f_positionSize(_entry, _stop) =>
+    riskPerUnit = math.abs(_entry - _stop)
+    riskPerUnit > 0 ? fixedRisk / riskPerUnit : na
+
+//=============================================================================
+// 7) ENTRY CONDITIONS
+//=============================================================================
 longCondition = inSession and (bullFVG or liquiditySweepLow or momentumLong) and htfBullTrend
 shortCondition = inSession and (bearFVG or liquiditySweepHigh or momentumShort) and htfBearTrend
 
 //=============================================================================
-// 7) RISK MANAGEMENT
-//=============================================================================
-riskPercent = input.float(2.0, "Risk Per Trade (%)")
-
-// Calculate position size based on risk and stop-loss distance
-f_positionSize(_entry, _stop) =>
-    riskAmount = strategy.equity * (riskPercent / 100)
-    distanceToSL = math.abs(_entry - _stop)
-    distanceToSL > 0 ? (riskAmount / distanceToSL) : na
-
-//=============================================================================
-// 8) ENTRY LOGIC
+// 8) ENTRY LOGIC WITH DYNAMIC RISK-REWARD
 //=============================================================================
 if longCondition
     entryPrice = close
     stopLoss = low[fvgLookback]  // Stop-loss just below the FVG
-    takeProfit = entryPrice + (entryPrice - stopLoss) * 2  // 2R Take-profit
+    takeProfit1 = entryPrice + (entryPrice - stopLoss) * 1  // 1:1 Take-profit
+    takeProfit2 = entryPrice + (entryPrice - stopLoss) * 2  // 1:2 Take-profit
+
     positionSize = f_positionSize(entryPrice, stopLoss)
     if not na(positionSize)
         strategy.entry("Long", strategy.long, qty=positionSize)
-        strategy.exit("Long TP/SL", from_entry="Long", stop=stopLoss, limit=takeProfit)
+        
+        // Exit logic: Check momentum for 1:2, otherwise close at 1:1
+        if momentumLong
+            strategy.exit("Long TP/SL (1:2)", from_entry="Long", stop=stopLoss, limit=takeProfit2)
+        else
+            strategy.exit("Long TP/SL (1:1)", from_entry="Long", stop=stopLoss, limit=takeProfit1)
 
 if shortCondition
     entryPrice = close
     stopLoss = high[fvgLookback]  // Stop-loss just above the FVG
-    takeProfit = entryPrice - (stopLoss - entryPrice) * 2  // 2R Take-profit
+    takeProfit1 = entryPrice - (stopLoss - entryPrice) * 1  // 1:1 Take-profit
+    takeProfit2 = entryPrice - (stopLoss - entryPrice) * 2  // 1:2 Take-profit
+
     positionSize = f_positionSize(entryPrice, stopLoss)
     if not na(positionSize)
         strategy.entry("Short", strategy.short, qty=positionSize)
-        strategy.exit("Short TP/SL", from_entry="Short", stop=stopLoss, limit=takeProfit)
+        
+        // Exit logic: Check momentum for 1:2, otherwise close at 1:1
+        if momentumShort
+            strategy.exit("Short TP/SL (1:2)", from_entry="Short", stop=stopLoss, limit=takeProfit2)
+        else
+            strategy.exit("Short TP/SL (1:1)", from_entry="Short", stop=stopLoss, limit=takeProfit1)
 
 //=============================================================================
-// 9) PLOTTING & DEBUGGING
+// CLEANED VISUALIZATION
 //=============================================================================
 // No additional visual elements for a clean chart
-

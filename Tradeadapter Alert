@@ -1,7 +1,7 @@
 // Uncle LARRY
 "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-002",
-      "oanda_api_token": "53aa1e1a3506aed9c9c12cd2febca8c5-07b9175931d4e54886100a3ef687b0f4",
+      "oanda_api_token": "53100329348b3b55d0f5b2836e6cf7da-dee88b476bc4382ddaba24667938f90e",
       "time": "{{timenow}}",
       "exchange": "{{exchange}}",
       "ticker": "{{ticker}}",
@@ -20,7 +20,7 @@
 // Shorty 
 "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-003",
-      "oanda_api_token": "53aa1e1a3506aed9c9c12cd2febca8c5-07b9175931d4e54886100a3ef687b0f4",
+      "oanda_api_token": "53100329348b3b55d0f5b2836e6cf7da-dee88b476bc4382ddaba24667938f90e",
       "time": "{{timenow}}",
       "exchange": "{{exchange}}",
       "ticker": "{{ticker}}",
@@ -40,7 +40,7 @@
 //Struggling
 "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-004",
-      "oanda_api_token": "53aa1e1a3506aed9c9c12cd2febca8c5-07b9175931d4e54886100a3ef687b0f4",
+      "oanda_api_token": "53100329348b3b55d0f5b2836e6cf7da-dee88b476bc4382ddaba24667938f90e",
       "time": "{{timenow}}",
       "exchange": "{{exchange}}",
       "ticker": "{{ticker}}",

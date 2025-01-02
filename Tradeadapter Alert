@@ -1,0 +1,16 @@
+  "tradeadapter_key": "7Q30YIMS86EXJXY4WB7G",
+      "oanda_user_id": "101-001-29240766-001",
+      "oanda_api_token": "53aa1e1a3506aed9c9c12cd2febca8c5-07b9175931d4e54886100a3ef687b0f4",
+      "time": "{{timenow}}",
+      "exchange": "{{exchange}}",
+      "ticker": "{{ticker}}",
+      "position_size": "{{strategy.position_size}}",
+      "order_action": "{{strategy.order.action}}",
+      "order_contracts": "{{strategy.order.contracts}}",
+      "order_price": "{{strategy.order.price}}",
+      "order_id": "{{strategy.order.id}}",
+      "market_position": "{{strategy.market_position}}",
+      "market_position_size": "{{strategy.market_position_size}}",
+      "prev_market_position": "{{strategy.prev_market_position}}",
+      "prev_market_position_size": "{{strategy.prev_market_position_size}}"
+}

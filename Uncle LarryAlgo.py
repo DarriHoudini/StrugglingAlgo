@@ -1,8 +1,15 @@
 //@version=5
-strategy("ICT Strategy with Fibonacci TP Levels", overlay=true, pyramiding=0)
+strategy("ICT Strategy with ATR Stop Loss & TP - $20 Risk", overlay=true, pyramiding=3)
 
 //=============================================================================
-// 1) SESSION LOGIC (Asian, London, and New York Sessions)
+// 1) ACCOUNT & RISK SETTINGS
+//=============================================================================
+accountBalance = 2000  // Account balance in USD
+riskPerTrade = 20      // Fixed risk per trade in $
+maxTrades = 3          // Maximum number of open trades
+
+//=============================================================================
+// 2) SESSION LOGIC (Asian, London, and New York Sessions)
 //=============================================================================
 asianStartHour = input.int(0, "Asian Start Hour")
 asianEndHour   = input.int(6, "Asian End Hour")
@@ -17,42 +24,16 @@ f_inSession(_t) =>
 inSession = f_inSession(time)
 
 //=============================================================================
-// 2) RECENT SWING HIGH/LOW LOGIC
-//=============================================================================
-lookbackPeriod = input.int(15, "Swing Lookback Period")
-recentHigh = ta.highest(high, lookbackPeriod)
-recentLow = ta.lowest(low, lookbackPeriod)
-
-//=============================================================================
-// 3) FIBONACCI EXTENSIONS FOR TAKE-PROFIT
-//=============================================================================
-// Define Fibonacci extension levels as numerical inputs
-fibLevel1 = input.float(1.0, "Fibonacci Level 1")
-fibLevel2 = input.float(1.618, "Fibonacci Level 2")
-fibLevel3 = input.float(2.0, "Fibonacci Level 3")
-
-// Calculate Fibonacci-based take-profit levels
-priceRange = recentHigh - recentLow
-fibTP1 = recentHigh + priceRange * fibLevel1
-fibTP2 = recentHigh + priceRange * fibLevel2
-fibTP3 = recentHigh + priceRange * fibLevel3
-
-// For shorts, invert the levels
-fibTP1Short = recentLow - priceRange * fibLevel1
-fibTP2Short = recentLow - priceRange * fibLevel2
-fibTP3Short = recentLow - priceRange * fibLevel3
-
-//=============================================================================
-// 4) ATR FOR ADDITIONAL STOP BUFFER
+// 3) ATR FOR STOP-LOSS AND TAKE-PROFIT
 //=============================================================================
 atrLength = input.int(14, "ATR Length")
-atrMultiplier = input.float(1.5, "ATR Stop Buffer Multiplier")
+atrStopMultiplier = input.float(2.0, "ATR Stop Loss Multiplier")
+atrTPMultiplier = input.float(4.0, "ATR Take Profit Multiplier")
 atrValue = ta.atr(atrLength)
 
 //=============================================================================
-// 5) FIXED $20 RISK CALCULATION
+// 4) POSITION SIZING
 //=============================================================================
-riskPerTrade = 20  // Fixed risk per trade in $
 pipValueMultiplier = input.float(10, "Pip Value Multiplier (depends on broker)")
 f_positionSize(_entry, _stop) =>
     stopLossDistance = math.abs(_entry - _stop)
@@ -61,7 +42,7 @@ f_positionSize(_entry, _stop) =>
     riskPerUnit > 0 ? riskPerTrade / riskPerUnit : na
 
 //=============================================================================
-// 6) ENTRY CONDITIONS
+// 5) ENTRY CONDITIONS
 //=============================================================================
 bullCondition = close > ta.sma(close, 20) and ta.crossover(close, ta.sma(close, 5))
 bearCondition = close < ta.sma(close, 20) and ta.crossunder(close, ta.sma(close, 5))
@@ -70,32 +51,28 @@ longCondition = inSession and bullCondition
 shortCondition = inSession and bearCondition
 
 //=============================================================================
-// 7) ENTRY LOGIC WITH FIBONACCI TAKE-PROFIT LEVELS
+// 6) ENTRY LOGIC WITH RISK MANAGEMENT
 //=============================================================================
+currentOpenTrades = strategy.opentrades
 
 // Long Trades
-if longCondition
+if longCondition and currentOpenTrades < maxTrades
     entryPrice = close
-    stopLoss = recentLow - (atrValue * atrMultiplier)  // Below recent low with ATR buffer
-    takeProfit1 = fibTP1  // First Fibonacci extension level
-    takeProfit2 = fibTP2  // Second Fibonacci extension level
+    stopLoss = entryPrice - (atrValue * atrStopMultiplier)  // 2x ATR below entry
+    takeProfit = entryPrice + (atrValue * atrTPMultiplier)  // 4x ATR above entry
 
     positionSize = f_positionSize(entryPrice, stopLoss)
     if not na(positionSize) and positionSize > 0
         strategy.entry("Long", strategy.long, qty=positionSize)
-        strategy.exit("Long TP1/SL", from_entry="Long", stop=stopLoss, limit=takeProfit1)
-        strategy.exit("Long TP2/SL", from_entry="Long", stop=stopLoss, limit=takeProfit2)
+        strategy.exit("Long TP/SL", from_entry="Long", stop=stopLoss, limit=takeProfit)
 
 // Short Trades
-if shortCondition
+if shortCondition and currentOpenTrades < maxTrades
     entryPrice = close
-    stopLoss = recentHigh + (atrValue * atrMultiplier)  // Above recent high with ATR buffer
-    takeProfit1 = fibTP1Short  // First Fibonacci extension level
-    takeProfit2 = fibTP2Short  // Second Fibonacci extension level
+    stopLoss = entryPrice + (atrValue * atrStopMultiplier)  // 2x ATR above entry
+    takeProfit = entryPrice - (atrValue * atrTPMultiplier)  // 4x ATR below entry
 
     positionSize = f_positionSize(entryPrice, stopLoss)
     if not na(positionSize) and positionSize > 0
         strategy.entry("Short", strategy.short, qty=positionSize)
-        strategy.exit("Short TP1/SL", from_entry="Short", stop=stopLoss, limit=takeProfit1)
-        strategy.exit("Short TP2/SL", from_entry="Short", stop=stopLoss, limit=takeProfit2)
-
+        strategy.exit("Short TP/SL", from_entry="Short", stop=stopLoss, limit=takeProfit)

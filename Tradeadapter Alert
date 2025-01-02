@@ -1,5 +1,5 @@
 // Uncle LARRY
-"tradeadapter_key": "7Q30YIMS86EXJXY4WB7G",
+"tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-002",
       "oanda_api_token": "53aa1e1a3506aed9c9c12cd2febca8c5-07b9175931d4e54886100a3ef687b0f4",
       "time": "{{timenow}}",
@@ -18,7 +18,7 @@
 
 
 // Shorty 
-"tradeadapter_key": "7Q30YIMS86EXJXY4WB7G",
+"tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-003",
       "oanda_api_token": "53aa1e1a3506aed9c9c12cd2febca8c5-07b9175931d4e54886100a3ef687b0f4",
       "time": "{{timenow}}",
@@ -38,7 +38,7 @@
 
 
 //Struggling
-"tradeadapter_key": "7Q30YIMS86EXJXY4WB7G",
+"tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-004",
       "oanda_api_token": "53aa1e1a3506aed9c9c12cd2febca8c5-07b9175931d4e54886100a3ef687b0f4",
       "time": "{{timenow}}",

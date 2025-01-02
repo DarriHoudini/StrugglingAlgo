@@ -1,60 +1,47 @@
 //@version=5
-strategy("Turtle Soup Shorting", overlay=true, pyramiding=0)
+strategy("Fibonacci Power of 3 Short", overlay=true, pyramiding=1)
 
 // Input Parameters
-lookback_high = input(20, title="Lookback Period for High")
 risk_per_trade = input.float(40, title="Risk Per Trade ($)", minval=1)
-atr_multiplier = input.float(1.5, title="ATR Multiplier for Stop-Loss")
-zone_buffer = input.float(0.0001, title="Buffer Above/Below Zone")
+fib_level_high = input.float(1.618, title="Fibonacci Extension Level High")
+fib_level_mid = input.float(1.0, title="Fibonacci Extension Level Mid")
+fib_level_low = input.float(0.618, title="Fibonacci Extension Level Low")
 
-// Calculations
-high_level = ta.highest(high, lookback_high)
-low_level = ta.lowest(low, lookback_high)
-atr = ta.atr(14)
+// Market Structure & Trend Detection
+is_downtrend = ta.highest(high, 50) > ta.lowest(low, 50) and close < ta.sma(close, 50)  // Downtrend based on lower highs and SMA
 
-// Supply and Demand Zones
-supply_zone = ta.valuewhen(high == high_level, high, 0)
-demand_zone = ta.valuewhen(low == low_level, low, 0)
+// Fibonacci Levels Calculation
+high_price = ta.highest(high, 10)  // Lookback period for impulse high
+low_price = ta.lowest(low, 10)    // Lookback period for impulse low
+price_range = high_price - low_price
+fib_level_382 = low_price + (price_range * 0.382)
+fib_level_618 = low_price + (price_range * 0.618)
 
-// Short Setup: Price breaks above the high level and reverses
-short_condition = high > high_level and close < high_level
+// Short Setup: Price moves above Fibonacci level and returns inside
+short_condition = is_downtrend and high > fib_level_618 and close < fib_level_618
 
 // Stop-Loss and Position Sizing for Shorts
-stop_loss_short = supply_zone + zone_buffer
+stop_loss_short = high_price  // Most recent swing high
 risk_per_unit_short = stop_loss_short - close
 position_size_short = risk_per_trade / math.abs(risk_per_unit_short)
-
-// Long Setup: Price breaks below the low level and reverses
-long_condition = low < low_level and close > low_level
-
-// Stop-Loss and Position Sizing for Longs
-stop_loss_long = demand_zone - zone_buffer
-risk_per_unit_long = close - stop_loss_long
-position_size_long = risk_per_trade / math.abs(risk_per_unit_long)
 
 // Execute Short Trade
 if short_condition
     entryPrice = close
-    takeProfit1 = supply_zone - (atr * atr_multiplier)  // First Fibonacci-like level
-    takeProfit2 = supply_zone - 2 * (atr * atr_multiplier)  // Second level
+    takeProfit1 = low_price - (price_range * 0.27)  // First take-profit below swing low
+    takeProfit2 = low_price - (price_range * 0.618)  // Second take-profit further down
     
-    strategy.entry("TurtleSoupShort", strategy.short, qty=position_size_short)
-    strategy.exit("Short TP1", from_entry="TurtleSoupShort", stop=stop_loss_short, limit=takeProfit1)
-    strategy.exit("Short TP2", from_entry="TurtleSoupShort", stop=stop_loss_short, limit=takeProfit2)
-
-// Execute Long Trade
-if long_condition
-    entryPrice = close
-    takeProfit1 = demand_zone + (atr * atr_multiplier)  // First Fibonacci-like level
-    takeProfit2 = demand_zone + 2 * (atr * atr_multiplier)  // Second level
-    
-    strategy.entry("TurtleSoupLong", strategy.long, qty=position_size_long)
-    strategy.exit("Long TP1", from_entry="TurtleSoupLong", stop=stop_loss_long, limit=takeProfit1)
-    strategy.exit("Long TP2", from_entry="TurtleSoupLong", stop=stop_loss_long, limit=takeProfit2)
+    strategy.entry("FibShort", strategy.short, qty=position_size_short)
+    strategy.exit("Short TP1", from_entry="FibShort", stop=stop_loss_short, limit=takeProfit1)
+    strategy.exit("Short TP2", from_entry="FibShort", stop=stop_loss_short, limit=takeProfit2)
 
 // Highlight Trades with Labels and Arrows
 if short_condition
     label.new(bar_index, high, text="Short", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.normal)
-if long_condition
-    label.new(bar_index, low, text="Long", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.normal)
+    line.new(x1=bar_index, y1=high, x2=bar_index, y2=stop_loss_short, color=color.red, width=2, style=line.style_solid)
 
+// Plot Fibonacci Levels
+plot(fib_level_382, color=color.orange, title="Fib Level 38.2%")
+plot(fib_level_618, color=color.green, title="Fib Level 61.8%")
+plot(high_price, color=color.red, title="Swing High")
+plot(low_price, color=color.blue, title="Swing Low")

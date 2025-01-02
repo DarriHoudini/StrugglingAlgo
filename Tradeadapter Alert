@@ -1,4 +1,5 @@
 // Uncle LARRY
+{
 "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-002",
       "oanda_api_token": "53100329348b3b55d0f5b2836e6cf7da-dee88b476bc4382ddaba24667938f90e",
@@ -18,6 +19,7 @@
 
 
 // Shorty 
+{
 "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-003",
       "oanda_api_token": "53100329348b3b55d0f5b2836e6cf7da-dee88b476bc4382ddaba24667938f90e",
@@ -38,6 +40,7 @@
 
 
 //Struggling
+{
 "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-004",
       "oanda_api_token": "53100329348b3b55d0f5b2836e6cf7da-dee88b476bc4382ddaba24667938f90e",

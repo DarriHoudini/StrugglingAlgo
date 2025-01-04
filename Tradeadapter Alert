@@ -16,6 +16,24 @@
       "prev_market_position": "{{strategy.prev_market_position}}",
       "prev_market_position_size": "{{strategy.prev_market_position_size}}"
 }
+// For Alpaca 
+{
+      "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
+      "alpaca_account":"paper",
+      "alpaca_api_key": "PKC7DLSK3AJZ1OFL2OAJ",
+      "alpaca_api_secret": "pwpCbcRx3J7saRvoXTpHGaizZNiCqXXVdH8xhOUh",
+      "real_order":"Yes / No",
+      "order_market":"Spot",
+      "order_type":"Market / Limit",
+      "isolated_margin": "Yes / No",
+      "exchange": "Alpaca",
+      "ticker": "{{ticker}}",
+      "time": "{{timenow}}",
+      "order_contracts": "{{strategy.order.contracts}}",
+      "order_action": "{{strategy.order.action}}",
+      "order_price": "{{strategy.order.price}}"
+  }
+
 
 
 // Shorty 
@@ -57,3 +75,24 @@
       "prev_market_position": "{{strategy.prev_market_position}}",
       "prev_market_position_size": "{{strategy.prev_market_position_size}}"
 }
+
+
+
+// Alpaca
+
+{
+      "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
+      "alpaca_account":"paper",
+      "alpaca_api_key": "PKDGLPF1QWAABUYNA6PH",
+      "alpaca_api_secret": "rhSiKxLX8xRLPwtfMWksWoqrqRbOgJvDhbhD0rk0",
+      "real_order":"Yes / No",
+      "order_market":"Spot",
+      "order_type":"Market / Limit",
+      "isolated_margin": "Yes / No",
+      "exchange": "Alpaca",
+      "ticker": "{{ticker}}",
+      "time": "{{timenow}}",
+      "order_contracts": "{{strategy.order.contracts}}",
+      "order_action": "{{strategy.order.action}}",
+      "order_price": "{{strategy.order.price}}"
+  }

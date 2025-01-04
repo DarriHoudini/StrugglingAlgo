@@ -37,6 +37,7 @@
 
 
 // Shorty 
+
 {
 "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-003",
@@ -53,11 +54,29 @@
       "market_position_size": "{{strategy.market_position_size}}",
       "prev_market_position": "{{strategy.prev_market_position}}",
       "prev_market_position_size": "{{strategy.prev_market_position_size}}"
-}
+} 
 
+// Alpaca
 
+{
+      "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
+      "alpaca_account":"paper",
+      "alpaca_api_key": "PKRYSDN64Y10OSJBA3HU",
+      "alpaca_api_secret": "ifsjRNPYgP7lAexPcanOWSHbTzmI4dRHGbqjm0Hw",
+      "real_order":"Yes / No",
+      "order_market":"Spot",
+      "order_type":"Market / Limit",
+      "isolated_margin": "Yes / No",
+      "exchange": "Alpaca",
+      "ticker": "{{ticker}}",
+      "time": "{{timenow}}",
+      "order_contracts": "{{strategy.order.contracts}}",
+      "order_action": "{{strategy.order.action}}",
+      "order_price": "{{strategy.order.price}}"
+  }
 
 //Struggling
+
 {
 "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-004",

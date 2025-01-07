@@ -1,83 +1,121 @@
 //@version=5
-strategy("Enhanced SMA & Fibonacci Strategy with 38.2%", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=2)
+strategy("StruggleAlgoV1", overlay=true, pyramiding=1)
 
 // === INPUT PARAMETERS ===
-starting_balance = input.float(2000, title="Starting Balance")
-max_daily_risk_pct = input.float(15, title="Max Daily Risk (%)")
-risk_per_trade_pct = input.float(2, title="Risk per Trade (%)")
+// Common Parameters
+starting_balance = input.float(2000, title="Starting Balance", group="Common Settings")
+max_daily_risk_pct = input.float(15, title="Max Daily Risk (%)", group="Common Settings")
+risk_per_trade_pct = input.float(2, title="Risk per Trade (%)", group="Common Settings")
+
+// ATR Settings
+atr_length = input.int(14, title="ATR Length", group="Common Settings")
+atr_multiplier_crypto = input.float(2.0, title="Crypto Multiplier", group="Common Settings")
+atr_multiplier_forex = input.float(1.0, title="Forex Multiplier", group="Common Settings")
+atr_multiplier_futures = input.float(1.5, title="Futures Multiplier", group="Common Settings")
+
+// Asset Class Selector
+asset_class = input.string("Forex", title="Asset Class", options=["Crypto", "Forex", "Futures"], group="Common Settings")
 
 // === VARIABLES ===
 var float max_daily_risk = (max_daily_risk_pct / 100) * starting_balance
 risk_per_trade = (risk_per_trade_pct / 100) * starting_balance
 var float daily_loss = 0.0  // Track daily loss
 
-// === SMA PARAMETERS ===
-len1 = input.int(5, title="SMA Length 1")
-len2 = input.int(15, title="SMA Length 2")
+// Calculate ATR
+atr = ta.atr(atr_length)
 
-// === FIBONACCI LEVELS ===
-high_price = ta.highest(high, 10)  // Lookback period for impulse high
-low_price = ta.lowest(low, 10)    // Lookback period for impulse low
+// Adjust ATR for Asset Class
+asset_multiplier = asset_class == "Crypto" ? atr_multiplier_crypto : 
+                   asset_class == "Forex"  ? atr_multiplier_forex : 
+                   atr_multiplier_futures
 
-fib_level_0 = low_price
-fib_level_382 = low_price + (high_price - low_price) * 0.382
-fib_level_50 = low_price + (high_price - low_price) * 0.5
-fib_level_618 = low_price + (high_price - low_price) * 0.618
-fib_level_786 = low_price + (high_price - low_price) * 0.786
-fib_target = high_price + (high_price - low_price) * 0.27
+adjusted_atr = atr * asset_multiplier
 
-// === DETECT SMA CROSS ===
+// === STRATEGY 1: Fibonacci Power of 3 Short ===
+// Fibonacci Levels Calculation
+high_price_power = ta.highest(high, 10)  // Lookback period for impulse high
+low_price_power = ta.lowest(low, 10)    // Lookback period for impulse low
+price_range_power = high_price_power - low_price_power
+fib_level_618_power = low_price_power + (price_range_power * 0.618)
+
+// Short Setup: Price moves above Fibonacci level and returns inside
+is_downtrend = ta.highest(high, 50) > ta.lowest(low, 50) and close < ta.sma(close, 50)  // Downtrend based on lower highs and SMA
+short_condition_fib_power = is_downtrend and high > fib_level_618_power and close < fib_level_618_power
+
+// Position Sizing for Short
+stop_loss_short_power = high_price_power  // Most recent swing high
+position_size_short_power = risk_per_trade / adjusted_atr
+
+// Execute Short Trade
+if short_condition_fib_power
+    strategy.entry("FibShort", strategy.short, qty=position_size_short_power)
+    strategy.exit("Short TP1", from_entry="FibShort", stop=stop_loss_short_power, limit=low_price_power - (price_range_power * 0.27))
+    strategy.exit("Short TP2", from_entry="FibShort", stop=stop_loss_short_power, limit=low_price_power - (price_range_power * 0.618))
+
+// Highlight Short Entry
+if short_condition_fib_power
+    label.new(bar_index, high, text="Short", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
+
+// === STRATEGY 2: Enhanced SMA & Fibonacci Strategy ===
+// Fibonacci Levels
+high_price_sma = ta.highest(high, 10)
+low_price_sma = ta.lowest(low, 10)
+fib_level_382_sma = low_price_sma + (high_price_sma - low_price_sma) * 0.382
+fib_level_50_sma = low_price_sma + (high_price_sma - low_price_sma) * 0.5
+fib_level_618_sma = low_price_sma + (high_price_sma - low_price_sma) * 0.618
+fib_level_786_sma = low_price_sma + (high_price_sma - low_price_sma) * 0.786
+fib_target_sma = high_price_sma + (high_price_sma - low_price_sma) * 0.27
+
+// Detect SMA Cross
+len1 = input.int(5, title="SMA Length 1", group="Enhanced SMA & Fibonacci")
+len2 = input.int(15, title="SMA Length 2", group="Enhanced SMA & Fibonacci")
 ema1 = ta.sma(close, len1)
 ema2 = ta.sma(close, len2)
 buy_tr = ta.crossover(ema1, ema2)
 sell_tr = ta.crossunder(ema1, ema2)
 
-// === DETECT IMPULSE MOVE ===
-// Added logic for 38.2% retracement level
-impulse_detected_long_382 = close > fib_level_382 and close < fib_level_50 and buy_tr
-impulse_detected_long_618 = close > fib_level_50 and close < fib_level_786 and buy_tr
-impulse_detected_short_382 = close < fib_level_382 and close > fib_level_50 and sell_tr
-impulse_detected_short_618 = close < fib_level_50 and close > fib_level_786 and sell_tr
+// Detect Impulse Move
+impulse_detected_long_382 = close > fib_level_382_sma and close < fib_level_50_sma and buy_tr
+impulse_detected_long_618 = close > fib_level_50_sma and close < fib_level_786_sma and buy_tr
+impulse_detected_short_382 = close < fib_level_382_sma and close > fib_level_50_sma and sell_tr
+impulse_detected_short_618 = close < fib_level_50_sma and close > fib_level_786_sma and sell_tr
 
-// === POSITION SIZING ===
-entry_price_long = fib_level_618
-stop_loss_price_long = fib_level_0
-entry_price_short = fib_level_618
-stop_loss_price_short = high_price
+// Position Sizing for SMA Strategy
+position_size_long = risk_per_trade / adjusted_atr
+position_size_short_sma = risk_per_trade / adjusted_atr
 
-take_profit_price_long = fib_target
-take_profit_price_short = low_price - (high_price - low_price) * 0.27
-
-position_size_long = risk_per_trade / math.abs(entry_price_long - stop_loss_price_long)
-position_size_short = risk_per_trade / math.abs(entry_price_short - stop_loss_price_short)
-
-// === TRACK DAILY LOSS ===
+// Track Daily Loss
 if daily_loss >= max_daily_risk
     strategy.close_all(comment="Max daily risk reached")
 
-// === ENTRY AND EXIT CONDITIONS ===
-// LONG Entry for 38.2% and 61.8% retracement levels
+// Entry and Exit Conditions
 if impulse_detected_long_382 and daily_loss < max_daily_risk
     strategy.entry("Long_382", strategy.long, qty=position_size_long, comment="Long_382")
-    strategy.exit("TakeProfit_382", "Long_382", limit=take_profit_price_long, stop=stop_loss_price_long)
+    strategy.exit("TakeProfit_382", "Long_382", limit=fib_target_sma, stop=low_price_sma)
+    label.new(bar_index, low, text="Long_382", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
 
 if impulse_detected_long_618 and daily_loss < max_daily_risk
     strategy.entry("Long_618", strategy.long, qty=position_size_long, comment="Long_618")
-    strategy.exit("TakeProfit_618", "Long_618", limit=take_profit_price_long, stop=stop_loss_price_long)
+    strategy.exit("TakeProfit_618", "Long_618", limit=fib_target_sma, stop=low_price_sma)
+    label.new(bar_index, low, text="Long_618", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
 
-// SHORT Entry for 38.2% and 61.8% retracement levels
 if impulse_detected_short_382 and daily_loss < max_daily_risk
-    strategy.entry("Short_382", strategy.short, qty=position_size_short, comment="Short_382")
-    strategy.exit("TakeProfit_382", "Short_382", limit=take_profit_price_short, stop=stop_loss_price_short)
+    strategy.entry("Short_382", strategy.short, qty=position_size_short_sma, comment="Short_382")
+    strategy.exit("TakeProfit_382", "Short_382", limit=fib_target_sma, stop=high_price_sma)
+    label.new(bar_index, high, text="Short_382", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
 
 if impulse_detected_short_618 and daily_loss < max_daily_risk
-    strategy.entry("Short_618", strategy.short, qty=position_size_short, comment="Short_618")
-    strategy.exit("TakeProfit_618", "Short_618", limit=take_profit_price_short, stop=stop_loss_price_short)
+    strategy.entry("Short_618", strategy.short, qty=position_size_short_sma, comment="Short_618")
+    strategy.exit("TakeProfit_618", "Short_618", limit=fib_target_sma, stop=high_price_sma)
+    label.new(bar_index, high, text="Short_618", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
 
-// === PLOT FIBONACCI LEVELS ===
-plot(fib_level_0, color=color.red, title="Fib Level 0")
-plot(fib_level_382, color=color.orange, title="Fib Level 38.2%")
-plot(fib_level_50, color=color.yellow, title="Fib Level 50%")
-plot(fib_level_618, color=color.green, title="Fib Level 61.8%")
-plot(fib_level_786, color=color.blue, title="Fib Level 78.6%")
-plot(fib_target, color=color.purple, title="Fib Target")
+// === DETERMINE OUTCOME (TP or SL) ===
+trade_closed = na(strategy.position_size[1]) and not na(strategy.position_size)  // Detect when trade closes
+is_tp = strategy.closedtrades.profit(strategy.closedtrades - 1) > 0
+is_sl = strategy.closedtrades.profit(strategy.closedtrades - 1) <= 0
+
+if trade_closed
+    if is_tp
+        label.new(bar_index, close, text="TP Hit", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
+    if is_sl
+        label.new(bar_index, close, text="SL Hit", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)

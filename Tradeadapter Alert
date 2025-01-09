@@ -115,3 +115,9 @@
       "order_action": "{{strategy.order.action}}",
       "order_price": "{{strategy.order.price}}"
   }
+
+
+
+https://tradeadapter.com/api/oanda/demo_order
+
+ https://tradeadapter.com/api/alpaca/demo_order

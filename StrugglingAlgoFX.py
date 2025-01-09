@@ -1,11 +1,11 @@
 //@version=5
-strategy("StruggleAlgoV1", overlay=true, pyramiding=1)
+strategy("StruggleAlgoV2)", overlay=true, pyramiding=1)
 
 // === INPUT PARAMETERS ===
 // Common Parameters
-starting_balance = input.float(2000, title="Starting Balance", group="Common Settings")
-max_daily_risk_pct = input.float(15, title="Max Daily Risk (%)", group="Common Settings")
-risk_per_trade_pct = input.float(2, title="Risk per Trade (%)", group="Common Settings")
+initial_balance = input.float(2000, title="Starting Balance", group="Common Settings")
+max_daily_risk_pct = input.float(5, title="Max Daily Risk (%)", group="Common Settings")  // Conservative daily risk cap
+max_risk_per_trade_pct = input.float(1, title="Max Risk Per Trade (%)", group="Common Settings")  // Reduced risk per trade
 
 // ATR Settings
 atr_length = input.int(14, title="ATR Length", group="Common Settings")
@@ -17,9 +17,12 @@ atr_multiplier_futures = input.float(1.5, title="Futures Multiplier", group="Com
 asset_class = input.string("Forex", title="Asset Class", options=["Crypto", "Forex", "Futures"], group="Common Settings")
 
 // === VARIABLES ===
-var float max_daily_risk = (max_daily_risk_pct / 100) * starting_balance
-risk_per_trade = (risk_per_trade_pct / 100) * starting_balance
 var float daily_loss = 0.0  // Track daily loss
+current_equity = strategy.equity  // Dynamic equity for compounding
+
+// Calculate Risk and Daily Loss Cap
+max_risk_per_trade = (max_risk_per_trade_pct / 100) * current_equity
+max_daily_risk = (max_daily_risk_pct / 100) * current_equity
 
 // Calculate ATR
 atr = ta.atr(atr_length)
@@ -43,14 +46,13 @@ is_downtrend = ta.highest(high, 50) > ta.lowest(low, 50) and close < ta.sma(clos
 short_condition_fib_power = is_downtrend and high > fib_level_618_power and close < fib_level_618_power
 
 // Position Sizing for Short
-stop_loss_short_power = high_price_power  // Most recent swing high
-position_size_short_power = risk_per_trade / adjusted_atr
+position_size_short_power = max_risk_per_trade / (adjusted_atr * 10)
 
 // Execute Short Trade
-if short_condition_fib_power
+if short_condition_fib_power and daily_loss < max_daily_risk
     strategy.entry("FibShort", strategy.short, qty=position_size_short_power)
-    strategy.exit("Short TP1", from_entry="FibShort", stop=stop_loss_short_power, limit=low_price_power - (price_range_power * 0.27))
-    strategy.exit("Short TP2", from_entry="FibShort", stop=stop_loss_short_power, limit=low_price_power - (price_range_power * 0.618))
+    strategy.exit("Short TP1", from_entry="FibShort", stop=high_price_power, limit=low_price_power - (price_range_power * 0.27))
+    strategy.exit("Short TP2", from_entry="FibShort", stop=high_price_power, limit=low_price_power - (price_range_power * 0.618))
 
 // Highlight Short Entry
 if short_condition_fib_power
@@ -81,8 +83,8 @@ impulse_detected_short_382 = close < fib_level_382_sma and close > fib_level_50_
 impulse_detected_short_618 = close < fib_level_50_sma and close > fib_level_786_sma and sell_tr
 
 // Position Sizing for SMA Strategy
-position_size_long = risk_per_trade / adjusted_atr
-position_size_short_sma = risk_per_trade / adjusted_atr
+position_size_long = max_risk_per_trade / (adjusted_atr * 10)
+position_size_short_sma = max_risk_per_trade / (adjusted_atr * 10)
 
 // Track Daily Loss
 if daily_loss >= max_daily_risk
@@ -119,3 +121,4 @@ if trade_closed
         label.new(bar_index, close, text="TP Hit", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
     if is_sl
         label.new(bar_index, close, text="SL Hit", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
+

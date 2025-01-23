@@ -2,7 +2,7 @@
 {
 "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
       "oanda_user_id": "101-001-29240766-002",
-      "oanda_api_token": "f45f1ce61b585fafc6df5b9216baff30-22aa7d09ba019a42b397960d4ffb275c"
+      "oanda_api_token": "f45f1ce61b585fafc6df5b9216baff30-22aa7d09ba019a42b397960d4ffb275c",
       "time": "{{timenow}}",
       "exchange": "{{exchange}}",
       "ticker": "{{ticker}}",

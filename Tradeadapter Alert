@@ -1,6 +1,6 @@
 // Uncle LARRY
 {
-"tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
+"tradeadapter_key": "KSSFAON1BNB32N4RU38H",
       "oanda_user_id": "101-001-29240766-002",
       "oanda_api_token": "f45f1ce61b585fafc6df5b9216baff30-22aa7d09ba019a42b397960d4ffb275c",
       "time": "{{timenow}}",
@@ -18,7 +18,7 @@
 }
 // For Alpaca 
 {
-      "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
+      "tradeadapter_key": "KSSFAON1BNB32N4RU38H",
       "alpaca_account":"paper",
       "alpaca_api_key": "PKC7DLSK3AJZ1OFL2OAJ",
       "alpaca_api_secret": "pwpCbcRx3J7saRvoXTpHGaizZNiCqXXVdH8xhOUh",
@@ -39,7 +39,7 @@
 // Shorty 
 
 {
-"tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
+"tradeadapter_key": "KSSFAON1BNB32N4RU38H",
       "oanda_user_id": "101-001-29240766-003",
       "oanda_api_token": "f45f1ce61b585fafc6df5b9216baff30-22aa7d09ba019a42b397960d4ffb275c",
       "time": "{{timenow}}",
@@ -59,7 +59,7 @@
 // Alpaca
 
 {
-      "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
+      "tradeadapter_key": "KSSFAON1BNB32N4RU38H",
       "alpaca_account":"paper",
       "alpaca_api_key": "PKRYSDN64Y10OSJBA3HU",
       "alpaca_api_secret": "ifsjRNPYgP7lAexPcanOWSHbTzmI4dRHGbqjm0Hw",
@@ -78,7 +78,7 @@
 //Struggling
 
 {
-"tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
+"tradeadapter_key": "KSSFAON1BNB32N4RU38H",
       "oanda_user_id": "101-001-29240766-004",
       "oanda_api_token": "f45f1ce61b585fafc6df5b9216baff30-22aa7d09ba019a42b397960d4ffb275c",
       "time": "{{timenow}}",
@@ -100,7 +100,7 @@
 // Alpaca
 
 {
-      "tradeadapter_key": "NPVKW7K01RIL5C9CEANA",
+      "tradeadapter_key": "KSSFAON1BNB32N4RU38H",
       "alpaca_account":"paper",
       "alpaca_api_key": "PKDGLPF1QWAABUYNA6PH",
       "alpaca_api_secret": "rhSiKxLX8xRLPwtfMWksWoqrqRbOgJvDhbhD0rk0",

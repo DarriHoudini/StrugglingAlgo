@@ -1,132 +1,73 @@
 //@version=5
-strategy("ICT + SMB + HitchHiker Scalp - London & New York Only", overlay=true, pyramiding=3)
+strategy("Uncle Larry V3)", overlay=true, default_qty_type=strategy.cash, default_qty_value=20, pyramiding=1)
 
-//=============================================================================
-// 1) ACCOUNT & RISK SETTINGS
-//=============================================================================
-accountBalance = 2000  
-riskPerTrade = 20      
-maxTrades = 3          
-
-//=============================================================================
-// 2) SESSION LOGIC (London & New York Sessions Only)
-//=============================================================================
-londonStart = timestamp(year(time), month(time), dayofmonth(time), 2, 00)   // London Open
-londonEnd = timestamp(year(time), month(time), dayofmonth(time), 11, 00)    // London Close
-nyStart = timestamp(year(time), month(time), dayofmonth(time), 11, 00)      // New York Open
-nyEnd = timestamp(year(time), month(time), dayofmonth(time), 16, 00)        // New York Close
-
-inSession = (time >= londonStart and time <= londonEnd) or (time >= nyStart and time <= nyEnd)
-
-//=============================================================================
-// 3) ATR-BASED STOP-LOSS & TAKE-PROFIT
-//=============================================================================
+// === Inputs
+riskPerTrade = input.float(20, "Risk Per Trade ($)")
 atrLength = input.int(14, "ATR Length")
-atrStopMultiplier = input.float(1.5, "ATR Stop Loss Multiplier")  
-atrTPMultiplier = input.float(4.0, "ATR Take Profit Multiplier")  
-atrValue = ta.atr(atrLength)
+structureLookback = input.int(10, "Structure Lookback")
+atrStopMultiplier = input.float(1.5, "Stop Loss Multiplier")
+atrTPMultiplier = input.float(4.0, "Take Profit Multiplier")
+pipValueMultiplier = input.float(10, "Pip Value Multiplier")
 
-//=============================================================================
-// 4) EMA/VWAP CONFIRMATION
-//=============================================================================
-ema9 = ta.ema(close, 9)
-vwap = ta.vwap(close)
+// === Sessions: London and New York
+londonStart = timestamp("GMT+0", year(time), month(time), dayofmonth(time), 2, 0)
+londonEnd   = timestamp("GMT+0", year(time), month(time), dayofmonth(time), 11, 0)
+nyStart     = timestamp("GMT+0", year(time), month(time), dayofmonth(time), 11, 0)
+nyEnd       = timestamp("GMT+0", year(time), month(time), dayofmonth(time), 16, 0)
 
-// Check for EMA 9 crossing VWAP
-emaUpCross = ta.crossover(ema9, vwap)
-emaDownCross = ta.crossunder(ema9, vwap)
+inLondonSession = time >= londonStart and time < londonEnd
+inNYSession     = time >= nyStart and time < nyEnd
 
-//=============================================================================
-// 5) LIQUIDITY GRAB DETECTION (Touch and Go Confirmation)
-//=============================================================================
-lookbackSwing = input.int(15, "Liquidity Grab Lookback Period")
-recentHigh = ta.highest(high, lookbackSwing)
-recentLow = ta.lowest(low, lookbackSwing)
+// === Track trades per session
+var int lastLondonTradeBar = na
+var int lastNYTradeBar = na
 
-wickThreshold = input.float(0.15, "Wick % for Rejection")  
-candleRange = high - low
-upperWick = high - close
-lowerWick = close - low
+tradedLondon = inLondonSession and (na(lastLondonTradeBar) or lastLondonTradeBar < londonStart)
+tradedNY = inNYSession and (na(lastNYTradeBar) or lastNYTradeBar < nyStart)
 
-liquidityGrabHigh = high >= recentHigh and (upperWick / candleRange) > wickThreshold
-liquidityGrabLow = low <= recentLow and (lowerWick / candleRange) > wickThreshold
+// === ATR
+atr = ta.atr(atrLength)
 
-//=============================================================================
-// 6) VOLUME CONFIRMATION
-//=============================================================================
-volCurrent = ta.sma(volume, 5)  
-volPrev = ta.sma(volume, 10)   
+// === BOS Detection Only (Volume removed)
+prevHigh = ta.highest(high[1], structureLookback)
+prevLow = ta.lowest(low[1], structureLookback)
+bosUp = close > prevHigh
+bosDown = close < prevLow
 
-volumeIncreasing = volCurrent >= volPrev
-
-//=============================================================================
-// 7) HITCHHIKER SCALP LOGIC (Adding to Existing Strategy)
-//=============================================================================
-// Define price range high and low within consolidation
-consolidationLookback = input.int(15, "Consolidation Lookback Period")
-consolidationHigh = ta.highest(high, consolidationLookback)
-consolidationLow = ta.lowest(low, consolidationLookback)
-
-// Check if consolidation is in upper 1/3 of the day's range
-dayHigh = ta.highest(high, 30)  
-dayLow = ta.lowest(low, 30)  
-upperThird = dayLow + ((dayHigh - dayLow) * 0.67)  
-
-validConsolidation = consolidationLow > upperThird
-
-// Entry Trigger: 1-Min Breakout of Consolidation
-hitchHikerBreakout = high > consolidationHigh
-
-//=============================================================================
-// 8) ENTRY CONDITIONS (Combining Both Strategies)
-//=============================================================================
-
-// Fashionably Late Scalp Entry Conditions
-bullConditionFLS = emaUpCross and (liquidityGrabLow or volumeIncreasing)
-bearConditionFLS = emaDownCross and (liquidityGrabHigh or volumeIncreasing)
-
-// HitchHiker Scalp Entry Conditions
-bullConditionHHS = hitchHikerBreakout and validConsolidation
-bearConditionHHS = hitchHikerBreakout and validConsolidation
-
-// Final Conditions (Either Strategy Can Trigger a Trade)
-longCondition = inSession and (bullConditionFLS or bullConditionHHS)
-shortCondition = inSession and (bearConditionFLS or bearConditionHHS)
-
-//=============================================================================
-// 9) POSITION SIZING FUNCTION (Margin-Based Risk of $20 Per Trade)
-//=============================================================================
-pipValueMultiplier = input.float(10, "Pip Value Multiplier (depends on broker)")
-
+// === Position Sizing
 f_positionSize(_entry, _stop) =>
-    stopLossDistance = math.abs(_entry - _stop)
+    dist = math.abs(_entry - _stop)
     pipValue = pipValueMultiplier / syminfo.pointvalue
-    riskPerUnit = stopLossDistance * pipValue
+    riskPerUnit = dist * pipValue
     riskPerUnit > 0 ? riskPerTrade / riskPerUnit : na
 
-currentOpenTrades = strategy.opentrades
-
-//=============================================================================
-// 10) TRADE EXECUTION
-//=============================================================================
-
-// Long Entry (Fashionably Late or HitchHiker)
-if longCondition and currentOpenTrades < maxTrades
+// === Long Trade
+if bosUp and (tradedLondon or tradedNY)
     entryPrice = close
-    stopLoss = math.min(low - (atrValue * atrStopMultiplier), consolidationLow - 0.02)  
-    takeProfit = entryPrice + (atrValue * atrTPMultiplier)  
+    stopLoss = close - atr * atrStopMultiplier
+    takeProfit = close + atr * atrTPMultiplier
+    size = f_positionSize(entryPrice, stopLoss)
+    if not na(size) and size > 0
+        strategy.entry("Long", strategy.long, qty=size)
+        strategy.exit("Long Exit", from_entry="Long", stop=stopLoss, limit=takeProfit)
+        if inLondonSession
+            lastLondonTradeBar := bar_index
+        if inNYSession
+            lastNYTradeBar := bar_index
 
-    positionSize = f_positionSize(entryPrice, stopLoss)
-    if not na(positionSize) and positionSize > 0
-        strategy.entry("Long", strategy.long, qty=positionSize)
-        strategy.exit("Long TP/SL", from_entry="Long", stop=stopLoss, limit=takeProfit)
-
-// Short Entry (Fashionably Late or HitchHiker)
-if shortCondition and currentOpenTrades < maxTrades
+// === Short Trade
+if bosDown and (tradedLondon or tradedNY)
     entryPrice = close
-    stopLoss = math.max(high + (atrValue * atrStopMultiplier), consolidationHigh + 0.02)  
-    takeProfit = entryPrice - (atrValue * atrTPMultiplier)  
-
+    stopLoss = close + atr * atrStopMultiplier
+    takeProfit = close - atr * atrTPMultiplier
+    size = f_positionSize(entryPrice, stopLoss)
+    if not na(size) and size > 0
+        strategy.entry("Short", strategy.short, qty=size)
+        strategy.exit("Short Exit", from_entry="Short", stop=stopLoss, limit=takeProfit)
+        if inLondonSession
+            lastLondonTradeBar := bar_index
+        if inNYSession
+            lastNYTradeBar := bar_index
     positionSize = f_positionSize(entryPrice, stopLoss)
     if not na(positionSize) and positionSize > 0
         strategy.entry("Short", strategy.short, qty=positionSize)

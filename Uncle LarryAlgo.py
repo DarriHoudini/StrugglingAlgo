@@ -68,7 +68,4 @@ if bosDown and (tradedLondon or tradedNY)
             lastLondonTradeBar := bar_index
         if inNYSession
             lastNYTradeBar := bar_index
-    positionSize = f_positionSize(entryPrice, stopLoss)
-    if not na(positionSize) and positionSize > 0
-        strategy.entry("Short", strategy.short, qty=positionSize)
-        strategy.exit("Short TP/SL", from_entry="Short", stop=stopLoss, limit=takeProfit)
+

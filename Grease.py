@@ -57,6 +57,7 @@ if (longSignal and canTrade)
     label.new(bar_index, low, "🟢 Buy", style=label.style_label_up)
     todayTradeCount += 1
     currentRisk := reducedRisk
+    alert("GREASEV1|LONG|" + syminfo.ticker + "|" + str.tostring(close) + "|" + str.tostring(stopLoss) + "|" + str.tostring(takeProfit), alert.freq_once_per_bar_close)
 
 if (shortSignal and canTrade)
     stopLoss = close + (atr * atrMult)
@@ -68,4 +69,5 @@ if (shortSignal and canTrade)
     label.new(bar_index, high, "🔴 Sell", style=label.style_label_down)
     todayTradeCount += 1
     currentRisk := reducedRisk
+    alert("GREASEV1|SHORT|" + syminfo.ticker + "|" + str.tostring(close) + "|" + str.tostring(stopLoss) + "|" + str.tostring(takeProfit), alert.freq_once_per_bar_close)
 

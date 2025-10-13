@@ -1,0 +1,308 @@
+#region Using declarations
+using System;
+using NinjaTrader.Cbi;
+using NinjaTrader.NinjaScript;
+using NinjaTrader.NinjaScript.Strategies;
+#endregion
+
+// ---------------------------------------------------
+// TurtleV4 — 15m ORB (Opening Range Breakout, Runner Edition)
+// ---------------------------------------------------
+// • Sessions (ET): 
+//   - Asian: 20:00–22:00
+//   - London: 03:00–05:00
+//   - New York: 09:30–11:30
+// • Risk: $500 per trade, soft cap at $550 (skip if 1 contract > $550)
+// • Partial exits: 
+//   - TP1 at 1R (close half, move SL to BE+1 tick)
+//   - TP2 at 2R (close rest)
+// • Max 2 trades per session, must be flat before new one
+// • Halt for the day if dailyPnL > 0 and next trade loses
+// ---------------------------------------------------
+
+namespace NinjaTrader.NinjaScript.Strategies
+{
+    public class TurtleV4 : Strategy
+    {
+        private const double RiskTarget = 500.0;
+        private const double RiskHardCap = 550.0;
+        private const int BreakBufferTicks = 1;
+        private const int BEPlusTicks = 1;
+
+        private DateTime lastDay = Core.Globals.MinDate;
+        private double dailyPnL = 0;
+        private bool dayHalted = false;
+
+        private string currentSessionKey = "";
+        private int sessionTrades = 0;
+
+        private bool orbBuilding = false;
+        private bool orbDefined = false;
+        private DateTime orbStartET;
+        private DateTime orbEndET;
+        private double orbHigh = double.MinValue;
+        private double orbLow = double.MaxValue;
+
+        private double tickValue = 1.25;
+        private double tickSize = 1.0;
+
+        private bool inTrade = false;
+        private bool isLong = false;
+        private double entryPrice = 0.0;
+        private bool halfTaken = false;
+
+        protected override void OnStateChange()
+        {
+            if (State == State.SetDefaults)
+            {
+                Name = "TurtleV4";
+                Calculate = Calculate.OnBarClose;
+                EntriesPerDirection = 2;
+                EntryHandling = EntryHandling.AllEntries;
+                IsOverlay = true;
+                IncludeCommission = true;
+            }
+            else if (State == State.Configure)
+            {
+                tickValue = GetTickValue(Instrument.MasterInstrument.Name);
+                tickSize = TickSize;
+            }
+        }
+
+        private double GetTickValue(string instrument)
+        {
+            instrument = instrument.ToUpper();
+            if (instrument.StartsWith("M6E")) return 0.625;
+            if (instrument.StartsWith("MNQ")) return 0.50;
+            if (instrument.StartsWith("MGC")) return 1.00;
+            if (instrument.StartsWith("MES")) return 1.25;
+            return Instrument.MasterInstrument.PointValue * TickSize;
+        }
+
+        private bool InAnySession(DateTime et, out string key, out DateTime sessionOpenET, out DateTime sessionEndET)
+        {
+            key = string.Empty;
+            sessionOpenET = DateTime.MinValue;
+            sessionEndET = DateTime.MinValue;
+
+            int h = et.Hour, m = et.Minute;
+
+            if (h == 20 || h == 21)
+            {
+                key = "ASIA-" + et.Date.ToString("yyyyMMdd");
+                sessionOpenET = new DateTime(et.Year, et.Month, et.Day, 20, 0, 0);
+                sessionEndET = new DateTime(et.Year, et.Month, et.Day, 22, 0, 0);
+                return true;
+            }
+            if (h == 3 || h == 4)
+            {
+                key = "LONDON-" + et.Date.ToString("yyyyMMdd");
+                sessionOpenET = new DateTime(et.Year, et.Month, et.Day, 3, 0, 0);
+                sessionEndET = new DateTime(et.Year, et.Month, et.Day, 5, 0, 0);
+                return true;
+            }
+            if ((h == 9 && m >= 30) || h == 10 || (h == 11 && m < 30))
+            {
+                key = "NY-" + et.Date.ToString("yyyyMMdd");
+                sessionOpenET = new DateTime(et.Year, et.Month, et.Day, 9, 30, 0);
+                sessionEndET = new DateTime(et.Year, et.Month, et.Day, 11, 30, 0);
+                return true;
+            }
+            return false;
+        }
+
+        private void ResetSession(string key, DateTime sessionOpen)
+        {
+            if (key != currentSessionKey)
+            {
+                currentSessionKey = key;
+                sessionTrades = 0;
+                orbStartET = sessionOpen;
+                orbEndET = sessionOpen.AddMinutes(15);
+                orbBuilding = true;
+                orbDefined = false;
+                orbHigh = double.MinValue;
+                orbLow = double.MaxValue;
+            }
+        }
+
+        private double DollarRiskPerContract(double stopDistance)
+        {
+            double ticks = Math.Abs(stopDistance / tickSize);
+            return ticks * tickValue;
+        }
+
+        private int ContractsForSoftRisk(double stopDistance)
+        {
+            double per = DollarRiskPerContract(stopDistance);
+            if (per <= 0) return 0;
+            if (per > RiskHardCap) return 0; // skip if single contract > hard cap
+
+            int qty = (int)Math.Floor(RiskTarget / per);
+            if (qty < 1) qty = 1;
+            while (qty > 1 && qty * per > RiskHardCap) qty--;
+            return qty;
+        }
+
+        protected override void OnBarUpdate()
+        {
+            if (CurrentBar < 20) return;
+
+            if (Times[0][0].Date != lastDay.Date)
+            {
+                dailyPnL = 0;
+                dayHalted = false;
+                lastDay = Times[0][0].Date;
+                currentSessionKey = "";
+                sessionTrades = 0;
+                orbBuilding = false;
+                orbDefined = false;
+                orbHigh = double.MinValue;
+                orbLow = double.MaxValue;
+            }
+
+            if (dayHalted) return;
+
+            DateTime et = Times[0][0].ToLocalTime();
+            string sessKey;
+            DateTime sessOpen, sessEnd;
+            if (!InAnySession(et, out sessKey, out sessOpen, out sessEnd)) return;
+
+            ResetSession(sessKey, sessOpen);
+            if (sessionTrades >= 2) return;
+            if (inTrade) return;
+
+            if (et >= orbStartET && et < orbEndET)
+            {
+                orbBuilding = true;
+                if (High[0] > orbHigh) orbHigh = High[0];
+                if (Low[0] < orbLow) orbLow = Low[0];
+                return;
+            }
+            else if (orbBuilding && et >= orbEndET)
+            {
+                orbDefined = true;
+                orbBuilding = false;
+                Draw.HorizontalLine(this, "ORB_H_" + currentSessionKey, orbHigh, Brushes.DimGray);
+                Draw.HorizontalLine(this, "ORB_L_" + currentSessionKey, orbLow, Brushes.DimGray);
+            }
+
+            if (!orbDefined) return;
+
+            double buffer = BreakBufferTicks * tickSize;
+            bool longBreak = Close[0] > (orbHigh + buffer);
+            bool shortBreak = Close[0] < (orbLow - buffer);
+
+            if (Position.MarketPosition != MarketPosition.Flat) return;
+
+            // -------- LONG ENTRY --------
+            if (longBreak)
+            {
+                double stopP = orbLow;
+                double stopDist = Close[0] - stopP;
+                if (stopDist <= 0) return;
+
+                int qty = ContractsForSoftRisk(stopDist);
+                if (qty < 1) return;
+
+                int q1 = qty / 2;
+                int q2 = qty - q1;
+                if (q1 == 0) { q1 = 1; q2 = Math.Max(0, qty - 1); }
+
+                double ticksToStop = Math.Abs(stopDist / tickSize);
+                int tp1Ticks = (int)Math.Round(ticksToStop * 1.0);
+                int tp2Ticks = (int)Math.Round(ticksToStop * 2.0);
+
+                SetStopLoss("LE1", CalculationMode.Price, stopP, false);
+                SetStopLoss("LE2", CalculationMode.Price, stopP, false);
+                SetProfitTarget("LE1", CalculationMode.Ticks, tp1Ticks);
+                SetProfitTarget("LE2", CalculationMode.Ticks, tp2Ticks);
+
+                EnterLong(q1, "LE1");
+                if (q2 > 0) EnterLong(q2, "LE2");
+
+                inTrade = true; isLong = true; entryPrice = Close[0];
+                halfTaken = false;
+                sessionTrades++;
+                return;
+            }
+
+            // -------- SHORT ENTRY --------
+            if (shortBreak)
+            {
+                double stopP = orbHigh;
+                double stopDist = stopP - Close[0];
+                if (stopDist <= 0) return;
+
+                int qty = ContractsForSoftRisk(stopDist);
+                if (qty < 1) return;
+
+                int q1 = qty / 2;
+                int q2 = qty - q1;
+                if (q1 == 0) { q1 = 1; q2 = Math.Max(0, qty - 1); }
+
+                double ticksToStop = Math.Abs(stopDist / tickSize);
+                int tp1Ticks = (int)Math.Round(ticksToStop * 1.0);
+                int tp2Ticks = (int)Math.Round(ticksToStop * 2.0);
+
+                SetStopLoss("SE1", CalculationMode.Price, stopP, false);
+                SetStopLoss("SE2", CalculationMode.Price, stopP, false);
+                SetProfitTarget("SE1", CalculationMode.Ticks, tp1Ticks);
+                SetProfitTarget("SE2", CalculationMode.Ticks, tp2Ticks);
+
+                EnterShort(q1, "SE1");
+                if (q2 > 0) EnterShort(q2, "SE2");
+
+                inTrade = true; isLong = false; entryPrice = Close[0];
+                halfTaken = false;
+                sessionTrades++;
+                return;
+            }
+        }
+
+        protected override void OnExecutionUpdate(Execution exec, string id, double price, int qty,
+                                                  MarketPosition pos, string orderId, DateTime time)
+        {
+            if (exec == null || exec.Order == null || exec.Order.OrderState != OrderState.Filled)
+                return;
+
+            dailyPnL = 0;
+            foreach (var t in SystemPerformance.AllTrades)
+                if (t.Exit != null && t.Exit.Time.Date == Time[0].Date)
+                    dailyPnL += t.ProfitCurrency;
+
+            if (!halfTaken)
+            {
+                if (exec.Order.FromEntrySignal == "LE1" && PositionAccount.MarketPosition == MarketPosition.Long)
+                {
+                    halfTaken = true;
+                    double be = entryPrice + BEPlusTicks * tickSize;
+                    SetStopLoss("LE2", CalculationMode.Price, be, false);
+                }
+                if (exec.Order.FromEntrySignal == "SE1" && PositionAccount.MarketPosition == MarketPosition.Short)
+                {
+                    halfTaken = true;
+                    double be = entryPrice - BEPlusTicks * tickSize;
+                    SetStopLoss("SE2", CalculationMode.Price, be, false);
+                }
+            }
+
+            if (PositionAccount.MarketPosition == MarketPosition.Flat)
+            {
+                bool wasLoss = false;
+                int count = SystemPerformance.AllTrades.Count;
+                if (count > 0)
+                {
+                    var last = SystemPerformance.AllTrades[count - 1];
+                    if (last != null && last.Exit != null && last.Exit.Time.Date == Time[0].Date)
+                        wasLoss = last.ProfitCurrency < 0;
+                }
+                inTrade = false;
+                halfTaken = false;
+
+                if (wasLoss && dailyPnL > 0)
+                    dayHalted = true;
+            }
+        }
+    }
+}

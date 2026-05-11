@@ -1,0 +1,167 @@
+//@version=5
+indicator("Struggling Indicator", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// =====================
+// INPUTS
+// =====================
+grp = "CISD Settings"
+requireSweep   = input.bool(true, "Require PDH/PDL sweep BEFORE CISD", group=grp)
+sweepLookback  = input.int(30, "Sweep lookback (5m bars)", minval=3, maxval=200, group=grp)
+structLookback = input.int(20, "Structure lookback (5m bars)", minval=5, maxval=200, group=grp)
+atrLen         = input.int(14, "ATR length (5m)", minval=1, maxval=100, group=grp)
+dispATRmult    = input.float(1.2, "Displacement: Range >= ATR * X", minval=0.1, step=0.1, group=grp)
+
+bullColor      = input.color(color.new(color.lime, 0), "Bull color", group=grp)
+bearColor      = input.color(color.new(color.red, 0),  "Bear color", group=grp)
+cisdWidth      = input.int(2, "CISD line width", minval=1, maxval=6, group=grp)
+
+// ✅ CISD sleek segment settings (NEW)
+showCisdSegments = input.bool(true, "Show CISD sleek segments", group=grp)
+segMinutes       = input.int(30, "CISD segment length (minutes)", minval=5, maxval=240, group=grp)
+segWidth         = input.int(3, "CISD segment width", minval=1, maxval=6, group=grp)
+
+grpPD = "PD Levels (TradingView Daily EXACT)"
+showPD      = input.bool(true, "Show PDH/PDL/PDO/PDC", group=grpPD)
+pdhpdlColor = input.color(color.white, "PDH/PDL Color", group=grpPD)
+pdhpdlWidth = input.int(1, "PDH/PDL Width", minval=1, maxval=4, group=grpPD)
+pdoPdcColor = input.color(color.new(color.green, 70), "PDO/PDC Dark Green", group=grpPD)
+pdoPdcWidth = input.int(1, "PDO/PDC Width", minval=1, maxval=3, group=grpPD)
+pdTextMinutesFromDayStart = input.int(360, "PD Text Position: minutes from Daily open", minval=0, maxval=1200, group=grpPD)
+
+// =====================
+// PD LEVELS FROM TRADINGVIEW DAILY (EXACT)
+// =====================
+pdh   = request.security(syminfo.tickerid, "D", high[1],  barmerge.gaps_off, barmerge.lookahead_off)
+pdl   = request.security(syminfo.tickerid, "D", low[1],   barmerge.gaps_off, barmerge.lookahead_off)
+pdo   = request.security(syminfo.tickerid, "D", open[1],  barmerge.gaps_off, barmerge.lookahead_off)
+pdc   = request.security(syminfo.tickerid, "D", close[1], barmerge.gaps_off, barmerge.lookahead_off)
+
+dTime = request.security(syminfo.tickerid, "D", time, barmerge.gaps_off, barmerge.lookahead_off)
+newDay = ta.change(dTime)
+
+txtXTime = dTime + pdTextMinutesFromDayStart * 60000
+
+// =====================
+// DRAW PD LEVEL RAYS + INLINE TEXT (STATIC)
+// =====================
+var line  pdhLine = na
+var line  pdlLine = na
+var line  pdoLine = na
+var line  pdcLine = na
+var label pdhLab  = na
+var label pdlLab  = na
+var label pdoLab  = na
+var label pdcLab  = na
+
+if showPD and (newDay or barstate.isfirst)
+    if not na(pdhLine)
+        line.delete(pdhLine)
+    if not na(pdlLine)
+        line.delete(pdlLine)
+    if not na(pdoLine)
+        line.delete(pdoLine)
+    if not na(pdcLine)
+        line.delete(pdcLine)
+    if not na(pdhLab)
+        label.delete(pdhLab)
+    if not na(pdlLab)
+        label.delete(pdlLab)
+    if not na(pdoLab)
+        label.delete(pdoLab)
+    if not na(pdcLab)
+        label.delete(pdcLab)
+
+    int x1 = dTime
+    int x2 = dTime + 86400000 * 30
+
+    pdhLine := line.new(x1=x1, y1=pdh, x2=x2, y2=pdh, xloc=xloc.bar_time, extend=extend.right, color=pdhpdlColor, width=pdhpdlWidth)
+    pdlLine := line.new(x1=x1, y1=pdl, x2=x2, y2=pdl, xloc=xloc.bar_time, extend=extend.right, color=pdhpdlColor, width=pdhpdlWidth)
+    pdoLine := line.new(x1=x1, y1=pdo, x2=x2, y2=pdo, xloc=xloc.bar_time, extend=extend.right, color=pdoPdcColor, width=pdoPdcWidth)
+    pdcLine := line.new(x1=x1, y1=pdc, x2=x2, y2=pdc, xloc=xloc.bar_time, extend=extend.right, color=pdoPdcColor, width=pdoPdcWidth)
+
+    // Text inside rays
+    pdhLab := label.new(x=txtXTime, y=pdh, xloc=xloc.bar_time, text="PDH", style=label.style_none, textcolor=pdhpdlColor, size=size.small)
+    pdlLab := label.new(x=txtXTime, y=pdl, xloc=xloc.bar_time, text="PDL", style=label.style_none, textcolor=pdhpdlColor, size=size.small)
+    pdoLab := label.new(x=txtXTime, y=pdo, xloc=xloc.bar_time, text="PDO", style=label.style_none, textcolor=pdoPdcColor, size=size.small)
+    pdcLab := label.new(x=txtXTime, y=pdc, xloc=xloc.bar_time, text="PDC", style=label.style_none, textcolor=pdoPdcColor, size=size.small)
+
+// =====================
+// CISD (5m confirmed) — returns dir, level, sigTime
+// NOTE: No BOS level needed.
+// =====================
+cisdPack_5m() =>
+    float pdhTF = request.security(syminfo.tickerid, "D", high[1], barmerge.gaps_off, barmerge.lookahead_off)
+    float pdlTF = request.security(syminfo.tickerid, "D", low[1],  barmerge.gaps_off, barmerge.lookahead_off)
+
+    float atrTF = ta.atr(atrLen)
+    float rngTF = high - low
+    bool  disp  = rngTF >= atrTF * dispATRmult
+
+    // Simple structure context (still used to validate displacement intent)
+    float prevStructHigh = ta.highest(high[1], structLookback)
+    float prevStructLow  = ta.lowest(low[1],  structLookback)
+
+    bool sweptLow  = ta.lowest(low[1], sweepLookback)  < pdlTF
+    bool sweptHigh = ta.highest(high[1], sweepLookback) > pdhTF
+
+    bool allowBull = (not requireSweep) or sweptLow
+    bool allowBear = (not requireSweep) or sweptHigh
+
+    // CISD direction logic (displacement + break)
+    bool bull = disp and allowBull and close > prevStructHigh
+    bool bear = disp and allowBear and close < prevStructLow
+
+    int   dir     = bull ? 1 : bear ? -1 : 0
+    float cisdLvl = (bull or bear) ? open : na
+
+    bool newSig  = (dir != 0) and (dir[1] == 0)
+    int  sigTime = newSig ? time : na
+
+    [dir, cisdLvl, sigTime]
+
+// Pull confirmed CISD from 5m
+[sig5, lvl5, t5] = request.security(syminfo.tickerid, "5", cisdPack_5m(), barmerge.gaps_off, barmerge.lookahead_off)
+newSig5 = not na(t5)
+
+// =====================
+// LIVE-ONLY CISD DISPLAY (SLEEK SEGMENTS + TEXT ONLY)
+// current direction only, last 2, wipe on flip
+// =====================
+var int activeDir = 0
+var line[]  cisdSegs  = array.new_line()
+var label[] labelsArr = array.new_label()
+
+wipeAll() =>
+    for i = 0 to array.size(cisdSegs) - 1
+        line.delete(array.get(cisdSegs, i))
+    for i = 0 to array.size(labelsArr) - 1
+        label.delete(array.get(labelsArr, i))
+    array.clear(cisdSegs)
+    array.clear(labelsArr)
+
+deleteOldestIfNeeded() =>
+    if array.size(cisdSegs) > 2
+        line.delete(array.shift(cisdSegs))
+        label.delete(array.shift(labelsArr))
+
+if newSig5 and showCisdSegments
+    dirNow = sig5
+    if activeDir != 0 and dirNow != activeDir
+        wipeAll()
+    activeDir := dirNow
+
+    col = dirNow == 1 ? bullColor : bearColor
+
+    // Time-based segment so it renders the same across timeframes
+    int x1s = t5
+    int x2s = t5 + segMinutes * 60000
+
+    ln = line.new(x1=x1s, y1=lvl5, x2=x2s, y2=lvl5, xloc=xloc.bar_time, extend=extend.none, color=col, width=segWidth)
+
+    // Text-only tag (no box/background)
+    txt = dirNow == 1 ? "Bull CISD (5m)" : "Bear CISD (5m)"
+    lb  = label.new(x=x1s, y=lvl5, xloc=xloc.bar_time, text=txt, style=label.style_none, textcolor=col, size=size.small)
+
+    array.push(cisdSegs, ln)
+    array.push(labelsArr, lb)
+    deleteOldestIfNeeded()
